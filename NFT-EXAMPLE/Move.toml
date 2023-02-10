@@ -1,0 +1,9 @@
+[package]
+name = "NFT"
+version = "0.18.0"
+
+[dependencies.NftProtocol]
+local = "../nft-protocol"
+
+[addresses]
+nft_example="0x0"
