@@ -2,6 +2,7 @@ module Souffl3::Market {
 
     use std::option::{Self, Option};
 
+    use sui::event;
     use sui::coin::{Self, Coin};
     use sui::transfer::{Self, share_object, transfer};
     use sui::object::{Self, ID , UID};
@@ -17,7 +18,7 @@ module Souffl3::Market {
 
     struct Witness has drop {}
 
-    struct Listing has key, store {
+    struct Listing<phantom FT> has key, store {
         id: UID,
         nft: ID,
         safe: ID,
@@ -28,7 +29,41 @@ module Souffl3::Market {
         is_generic: bool
     }
 
-    public entry fun list<C>(
+    struct ListEvent<phantom FT> has copy, drop {
+        seller: address,
+        nft_id: ID,
+        safe_id: ID,
+        price: u64,
+        marketplace: ID,
+    }
+
+    struct DelistEvent<phantom FT> has copy, drop {
+        seller: address,
+        nft_id: ID,
+        safe_id: ID,
+        marketplace: ID
+    }
+
+    struct ChangePriceEvent<phantom FT> has copy, drop {
+        seller: address,
+        nft_id: ID,
+        safe_id: ID,
+        marketplace: ID,
+        old_price: u64,
+        new_price: u64
+
+    }
+
+    struct BuyEvent<phantom FT> has copy, drop {
+        seller: address,
+        buyer: address,
+        nft_id: ID,
+        safe_id: ID,
+        marketplace: ID,
+        price: u64
+    }
+
+    public entry fun list<C, FT>(
         nft: Nft<C>,
         price: u64,
         market: &MarketPlace,
@@ -46,12 +81,13 @@ module Souffl3::Market {
         // get transfer cap from safe (not exclusive
         let transfer_cap = safe::create_transfer_cap(nft_id, &cap, &mut safe_, ctx);
         let some_transfer_cap = option::some(transfer_cap);
+        let seller = tx_context::sender(ctx);
 
-        let listing = Listing {
+        let listing = Listing<FT> {
             id: object::new(ctx),
             nft: nft_id,
             safe: safe_id,
-            seller: tx_context::sender(ctx),
+            seller,
             price,
             market_id,
             transfer_cap: some_transfer_cap,
@@ -61,9 +97,17 @@ module Souffl3::Market {
         share_object(listing);
         share_object(safe_);
         transfer::transfer(cap, tx_context::sender(ctx));
+
+        event::emit(ListEvent<FT> {
+            seller,
+            nft_id,
+            safe_id,
+            price,
+            marketplace: market_id
+        })
     }
 
-    public entry fun list_generic<T: key + store>(
+    public entry fun list_generic<T: key + store, FT>(
         nft: T,
         price: u64,
         market: &MarketPlace,
@@ -81,12 +125,13 @@ module Souffl3::Market {
         // get transfer cap from safe (not exclusive
         let transfer_cap = safe::create_transfer_cap(nft_id, &cap, &mut safe_, ctx);
         let some_transfer_cap = option::some(transfer_cap);
+        let seller = tx_context::sender(ctx);
 
-        let listing = Listing {
+        let listing = Listing<FT> {
             id: object::new(ctx),
             nft: nft_id,
             safe: safe_id,
-            seller: tx_context::sender(ctx),
+            seller,
             price,
             market_id,
             transfer_cap: some_transfer_cap,
@@ -96,10 +141,18 @@ module Souffl3::Market {
         share_object(listing);
         share_object(safe_);
         transfer::transfer(cap, tx_context::sender(ctx));
+
+        event::emit(ListEvent<FT> {
+            seller,
+            nft_id,
+            safe_id,
+            price,
+            marketplace: market_id
+        })
     }
 
-    public entry fun delist<C>(
-        listing: &mut Listing,
+    public entry fun delist<C, FT>(
+        listing: &mut Listing<FT>,
         safe: &mut Safe,
         allowlist: &Allowlist,
         ctx: &mut TxContext
@@ -109,10 +162,16 @@ module Souffl3::Market {
         let seller = listing.seller;
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_nft_to_recipient<C, Witness>(transfer_cap, seller, Witness{}, allowlist, safe);
+        event::emit(DelistEvent<FT> {
+            seller,
+            nft_id: listing.nft,
+            safe_id: listing.safe,
+            marketplace: listing.market_id
+        })
     }
 
-    public entry fun delist_generic<T: key + store>(
-        listing: &mut Listing,
+    public entry fun delist_generic<T: key + store, FT>(
+        listing: &mut Listing<FT>,
         safe: &mut Safe,
         ctx: &mut TxContext
     ) {
@@ -121,10 +180,16 @@ module Souffl3::Market {
         let seller = listing.seller;
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_generic_nft_to_recipient<T>(transfer_cap, seller, safe);
+        event::emit(DelistEvent<FT> {
+            seller,
+            nft_id: listing.nft,
+            safe_id: listing.safe,
+            marketplace: listing.market_id
+        })
     }
 
     public entry fun buy<C, FT>(
-        listing: &mut Listing,
+        listing: &mut Listing<FT>,
         seller_safe: &mut Safe,
         allowlist: &Allowlist,
         market: &MarketPlace,
@@ -158,22 +223,33 @@ module Souffl3::Market {
         );
 
         let seller = listing.seller;
+        let buyer = tx_context::sender(ctx);
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_nft_to_recipient<C, Witness>(transfer_cap, seller, Witness{}, allowlist, seller_safe);
+
+        event::emit(BuyEvent<FT> {
+            seller,
+            buyer,
+            nft_id: listing.nft,
+            safe_id: listing.safe,
+            marketplace: listing.market_id,
+            price: listing.price
+        })
     }
 
     public entry fun buy_generic<T: key + store, FT>(
-        listing: &mut Listing,
+        listing: &mut Listing<FT>,
         seller_safe: &mut Safe,
         market: &MarketPlace,
         wallet: &mut Coin<FT>,
         ctx: &mut TxContext
     ) {
+        let balance_mut = coin::balance_mut(wallet);
         // transfer market fee to beneficiary
         let market_fee = marketplace::calc_market_fee(market, listing.price);
         transfer(
             coin::take(
-                coin::balance_mut(wallet),
+                balance_mut,
                 market_fee,
                 ctx,
             ),
@@ -182,29 +258,48 @@ module Souffl3::Market {
         // transfer market fee to marketplace
         let remaining = listing.price - market_fee;
         // transfer remaining coin to seller
-        let remaining_balance = coin::take(coin::balance_mut(wallet), remaining, ctx);
+        let remaining_balance = coin::take(balance_mut, remaining, ctx);
         transfer(
             remaining_balance,
             listing.seller
         );
         let seller = listing.seller;
+        let buyer = tx_context::sender(ctx);
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_generic_nft_to_recipient<T>(transfer_cap, seller, seller_safe);
+
+        event::emit(BuyEvent<FT> {
+            seller,
+            buyer,
+            nft_id: listing.nft,
+            safe_id: listing.safe,
+            marketplace: listing.market_id,
+            price: listing.price
+        })
     }
 
     public entry fun change_price<FT>(
-        listing: &mut Listing,
+        listing: &mut Listing<FT>,
         price: u64,
         ctx: &mut TxContext
     ) {
         // assert listing.seller is signer
         let sender = tx_context::sender(ctx);
         let seller = listing.seller;
+        let old_price = listing.price;
         assert!(sender == seller, 1);
         listing.price = price;
+        event::emit(ChangePriceEvent<FT> {
+            seller,
+            nft_id: listing.nft,
+            safe_id: listing.safe,
+            marketplace: listing.market_id,
+            old_price,
+            new_price: price
+        })
     }
 
-    fun extract_transfer_cap_from_listing(listing: &mut Listing): TransferCap {
+    fun extract_transfer_cap_from_listing<FT>(listing: &mut Listing<FT>): TransferCap {
         option::extract<TransferCap>(&mut listing.transfer_cap)
     }
 }
