@@ -77,7 +77,7 @@ module nft_example::suimarines {
         tags::add_tag(&mut tags, tags::art());
         tags::add_collection_tag_domain(&mut collection, &mut mint_cap, tags);
 
-        transfer::transfer(mint_cap, tx_context::sender(ctx));
+        transfer::share_object(mint_cap);
         transfer::share_object(collection);
     }
 

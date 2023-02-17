@@ -2,7 +2,6 @@ module Souffl3::Market {
 
     use std::option::{Self, Option};
 
-    use sui::pay;
     use sui::event;
     use sui::coin::{Self, Coin};
     use sui::transfer::{Self, share_object, transfer};
@@ -195,17 +194,15 @@ module Souffl3::Market {
         allowlist: &Allowlist,
         market: &MarketPlace,
         collection: &mut Collection<C>,
-        // TODO: aggregator
-        wallet: vector<Coin<FT>>,
+        wallet: &mut Coin<FT>,
         ctx: &mut TxContext
     ) {
-        let coins = coin::zero<FT>(ctx);
-        pay::join_vec(&mut coins, wallet);
+        let balance_mut = coin::balance_mut(wallet);
         // transfer market fee to beneficiary
         let market_fee = marketplace::calc_market_fee(market, listing.price);
         transfer(
             coin::take(
-                coin::balance_mut(&mut coins),
+                balance_mut,
                 market_fee,
                 ctx,
             ),
@@ -215,11 +212,11 @@ module Souffl3::Market {
         let domain = royalty::royalty_domain(collection);
         let royalty_owed =
             royalty::calculate_proportional_royalty(domain, listing.price);
-        royalty::collect_royalty(collection, coin::balance_mut(&mut coins), royalty_owed);
+        royalty::collect_royalty(collection, balance_mut, royalty_owed);
 
         let remaining = listing.price - royalty_owed - market_fee;
         // safe::transfer_nft_to_safe with transfer_cap in listing
-        let remaining_balance = coin::take(coin::balance_mut(&mut coins), remaining, ctx);
+        let remaining_balance = coin::take(balance_mut, remaining, ctx);
         transfer(
             remaining_balance,
             listing.seller
@@ -229,7 +226,6 @@ module Souffl3::Market {
         let buyer = tx_context::sender(ctx);
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_nft_to_recipient<C, Witness>(transfer_cap, seller, Witness{}, allowlist, seller_safe);
-        transfer::transfer(coins, tx_context::sender(ctx));
 
         event::emit(BuyEvent<FT> {
             seller,
@@ -245,16 +241,15 @@ module Souffl3::Market {
         listing: &mut Listing<FT>,
         seller_safe: &mut Safe,
         market: &MarketPlace,
-        wallet: vector<Coin<FT>>,
+        wallet: &mut Coin<FT>,
         ctx: &mut TxContext
     ) {
+        let balance_mut = coin::balance_mut(wallet);
         // transfer market fee to beneficiary
         let market_fee = marketplace::calc_market_fee(market, listing.price);
-        let coins = coin::zero<FT>(ctx);
-        pay::join_vec(&mut coins, wallet);
         transfer(
             coin::take(
-                coin::balance_mut(&mut coins),
+                balance_mut,
                 market_fee,
                 ctx,
             ),
@@ -263,7 +258,7 @@ module Souffl3::Market {
         // transfer market fee to marketplace
         let remaining = listing.price - market_fee;
         // transfer remaining coin to seller
-        let remaining_balance = coin::take(coin::balance_mut(&mut coins), remaining, ctx);
+        let remaining_balance = coin::take(balance_mut, remaining, ctx);
         transfer(
             remaining_balance,
             listing.seller
@@ -272,7 +267,6 @@ module Souffl3::Market {
         let buyer = tx_context::sender(ctx);
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_generic_nft_to_recipient<T>(transfer_cap, seller, seller_safe);
-        transfer::transfer(coins, tx_context::sender(ctx));
 
         event::emit(BuyEvent<FT> {
             seller,

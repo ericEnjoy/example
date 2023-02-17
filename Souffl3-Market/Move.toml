@@ -7,5 +7,5 @@ Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-fram
 NftProtocol = {local = "../nft-protocol/" }
 
 [addresses]
-Souffl3 =  "0x0"
+Souffl3 =  "0xc3068e837c975ae949bffc00221c686785d09568"
 sui =  "0000000000000000000000000000000000000002"
