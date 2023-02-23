@@ -3,17 +3,20 @@ module nft_example::suimarines {
 
     use sui::url;
     use sui::balance;
-    use sui::transfer::{Self, share_object};
+    use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
     use nft_protocol::nft;
     use nft_protocol::tags;
     use nft_protocol::royalty;
     use nft_protocol::display;
+    use nft_protocol::witness;
     use nft_protocol::creators;
+    use nft_protocol::mint_cap::MintCap;
     use nft_protocol::transfer_allowlist;
     use nft_protocol::royalties::{Self, TradePayment};
-    use nft_protocol::collection::{Self, Collection, MintCap};
+    use nft_protocol::collection::{Self, Collection};
+    use nft_protocol::transfer_allowlist_domain;
 
     /// One time witness is only instantiated in the init method
     struct SUIMARINES has drop {}
@@ -24,60 +27,62 @@ module nft_example::suimarines {
     struct Witness has drop {}
 
     fun init(witness: SUIMARINES, ctx: &mut TxContext) {
-        let (mint_cap, collection) = collection::create(
-            &witness, ctx,
-        );
+        let sender = tx_context::sender(ctx);
+
+        let (mint_cap, collection) = collection::create(&witness, ctx);
+        let delegated_witness = witness::from_witness(&Witness {});
 
         collection::add_domain(
+            delegated_witness,
             &mut collection,
-            &mut mint_cap,
-            creators::from_address(tx_context::sender(ctx), ctx)
+            creators::from_address<SUIMARINES, Witness>(
+                &Witness {}, sender,
+            ),
         );
-
-        let list = transfer_allowlist::create(Witness {}, ctx);
-        let collection_cap = transfer_allowlist::create_collection_cap<SUIMARINES, Witness>(&Witness {}, ctx);
-
-        transfer_allowlist::insert_collection(
-            Witness {},
-            &collection_cap,
-            &mut list,
-        );
-
-        share_object(list);
-        transfer::transfer(collection_cap, tx_context::sender(ctx));
 
         // Register custom domains
         display::add_collection_display_domain(
+            delegated_witness,
             &mut collection,
-            &mut mint_cap,
             string::utf8(b"Suimarines"),
             string::utf8(b"A unique NFT collection of Suimarines on Sui"),
-            ctx
         );
 
         display::add_collection_url_domain(
+            delegated_witness,
             &mut collection,
-            &mut mint_cap,
             sui::url::new_unsafe_from_bytes(b"https://originbyte.io/"),
-            ctx
         );
 
         display::add_collection_symbol_domain(
+            delegated_witness,
             &mut collection,
-            &mut mint_cap,
             string::utf8(b"SUIM"),
-            ctx
         );
 
-        let royalty = royalty::from_address(tx_context::sender(ctx), ctx);
+        let royalty = royalty::from_address(sender, ctx);
         royalty::add_proportional_royalty(&mut royalty, 100);
-        royalty::add_royalty_domain(&mut collection, &mut mint_cap, royalty);
+        royalty::add_royalty_domain(delegated_witness, &mut collection, royalty);
 
         let tags = tags::empty(ctx);
         tags::add_tag(&mut tags, tags::art());
-        tags::add_collection_tag_domain(&mut collection, &mut mint_cap, tags);
+        tags::add_collection_tag_domain(delegated_witness, &mut collection, tags);
+
+        let allowlist = transfer_allowlist::create(&Witness {}, ctx);
+        transfer_allowlist::insert_collection<SUIMARINES, Witness>(
+            &Witness {},
+            witness::from_witness(&Witness {}),
+            &mut allowlist,
+        );
+
+        collection::add_domain(
+            delegated_witness,
+            &mut collection,
+            transfer_allowlist_domain::empty(),
+        );
 
         transfer::share_object(mint_cap);
+        transfer::share_object(allowlist);
         transfer::share_object(collection);
     }
 
@@ -103,33 +108,24 @@ module nft_example::suimarines {
         url: vector<u8>,
         attribute_keys: vector<String>,
         attribute_values: vector<String>,
-        _mint_cap: &MintCap<SUIMARINES>,
+        mint_cap: &MintCap<SUIMARINES>,
         ctx: &mut TxContext,
     ) {
-        let nft = nft::new<SUIMARINES, Witness>(
-            &Witness {}, tx_context::sender(ctx), ctx
-        );
+        let url = url::new_unsafe_from_bytes(url);
+
+        let nft = nft::from_mint_cap(mint_cap, name, url, ctx);
+        let delegated_witness = witness::from_witness(&Witness {});
 
         display::add_display_domain(
-            &mut nft,
-            name,
-            description,
-            ctx,
+            delegated_witness, &mut nft, name, description,
         );
 
-        display::add_url_domain(
-            &mut nft,
-            url::new_unsafe_from_bytes(url),
-            ctx,
-        );
+        display::add_url_domain(delegated_witness, &mut nft, url);
 
         display::add_attributes_domain_from_vec(
-            &mut nft,
-            attribute_keys,
-            attribute_values,
-            ctx,
+            delegated_witness, &mut nft, attribute_keys, attribute_values,
         );
 
-        transfer::transfer(nft, tx_context::sender(ctx))
+        transfer::transfer(nft, tx_context::sender(ctx));
     }
 }

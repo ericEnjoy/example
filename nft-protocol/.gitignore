@@ -1,9 +1,0 @@
-sui.log.2023-02-09
-.env
-build
-target
-output.bpl
-.coverage_*
-.trace
-boilerplate
-.DS_Store

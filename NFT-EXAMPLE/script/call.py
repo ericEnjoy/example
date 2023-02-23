@@ -36,12 +36,13 @@ print(client.config.active_address)
 
 result = client.move_call_txn(
     signer=client.config.active_address,
-    package_object_id=SuiString("0xbcae3b5adb19abf3cc3e0c693bf976ef86a87479"),
+    package_object_id=SuiString("0x8c26c693a8498717456c3801afec323d9e4e6282"),
     module=SuiString("suimarines"),
     function=SuiString("mint_nft"),
     type_arguments=SuiArray([]),
-    arguments=[SuiString("name"), SuiString("description"), SuiString("https://static.souffl3.com/token-image/NzTteL9KnDKvP25BEgw9LM77rQgPkMR6E2RkuuGejY5G8ckv4UcZz3s9fEPjMPMkbWYybupeSH7xjJmkCjma1TsZy"), SuiArray(["key"]), SuiArray(["val"]), ObjectID("0x4c453d04a002a1a3e80b7bd693f04ea22de7c3d7")],
-    gas=gases[2].identifier,
+    arguments=[SuiString("name"), SuiString("description"), SuiString("https://static.souffl3.com/token-image/NzTteL9KnDKvP25BEgw9LM77rQgPkMR6E2RkuuGejY5G8ckv4UcZz3s9fEPjMPMkbWYybupeSH7xjJmkCjma1TsZy"), SuiArray(["key"]), SuiArray(["val"]), ObjectID("0x46ce08a45f7b7c7fb869b8b36fb7286583733283")],
+    gas=gases[0].identifier,
+
     gas_budget=SuiInteger(10000),
 )
 
