@@ -3,9 +3,8 @@ name = "Souffl3-Market"
 version = "0.0.1"
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "devnet" }
-NftProtocol = {local = "../nft-protocol/" }
+NftProtocol = {git = "git@github.com:Origin-Byte/nft-protocol.git", rev="main" }
 
 [addresses]
-Souffl3 =  "0xc3068e837c975ae949bffc00221c686785d09568"
+Souffl3 =  "0x9928a8d3d9ada1e44d4c6ba193597928dc237ab6"
 sui =  "0000000000000000000000000000000000000002"

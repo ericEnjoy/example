@@ -2,8 +2,8 @@
 name = "NFT"
 version = "0.18.0"
 
-[dependencies.NftProtocol]
-local = "../nft-protocol"
+[dependencies]
+NftProtocol = {git = "git@github.com:Origin-Byte/nft-protocol.git", rev="main" }
 
 [addresses]
 nft_example="0x0"
