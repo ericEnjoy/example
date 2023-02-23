@@ -42,6 +42,7 @@ result = client.move_call_txn(
     type_arguments=SuiArray([]),
     arguments=[SuiString("name"), SuiString("description"), SuiString("https://static.souffl3.com/token-image/NzTteL9KnDKvP25BEgw9LM77rQgPkMR6E2RkuuGejY5G8ckv4UcZz3s9fEPjMPMkbWYybupeSH7xjJmkCjma1TsZy"), SuiArray(["key"]), SuiArray(["val"]), ObjectID("0x46ce08a45f7b7c7fb869b8b36fb7286583733283")],
     gas=gases[0].identifier,
+
     gas_budget=SuiInteger(10000),
 )
 
