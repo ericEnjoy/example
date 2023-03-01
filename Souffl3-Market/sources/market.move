@@ -1,5 +1,6 @@
 module Souffl3::Market {
 
+    use std::vector;
     use std::option::{Self, Option};
 
     use sui::event;
@@ -7,6 +8,7 @@ module Souffl3::Market {
     use sui::transfer::{Self, share_object, transfer};
     use sui::object::{Self, ID , UID};
     use sui::tx_context::{Self, TxContext};
+    use sui::pay::join_vec;
 
     use nft_protocol::royalty;
     use nft_protocol::nft::Nft;
@@ -194,10 +196,12 @@ module Souffl3::Market {
         allowlist: &Allowlist,
         market: &MarketPlace,
         collection: &mut Collection<C>,
-        wallet: &mut Coin<FT>,
+        wallet: vector<Coin<FT>>,
         ctx: &mut TxContext
     ) {
-        let balance_mut = coin::balance_mut(wallet);
+        let coin_ = vector::pop_back(&mut wallet);
+        join_vec(&mut coin_, wallet);
+        let balance_mut = coin::balance_mut(&mut coin_);
         // transfer market fee to beneficiary
         let market_fee = marketplace::calc_market_fee(market, listing.price);
         transfer(
@@ -226,6 +230,7 @@ module Souffl3::Market {
         let buyer = tx_context::sender(ctx);
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_nft_to_recipient<C, Witness>(transfer_cap, seller, Witness{}, allowlist, seller_safe);
+        transfer::transfer(coin_, buyer);
 
         event::emit(BuyEvent<FT> {
             seller,
@@ -241,10 +246,12 @@ module Souffl3::Market {
         listing: &mut Listing<FT>,
         seller_safe: &mut Safe,
         market: &MarketPlace,
-        wallet: &mut Coin<FT>,
+        wallet: vector<Coin<FT>>,
         ctx: &mut TxContext
     ) {
-        let balance_mut = coin::balance_mut(wallet);
+        let coin_ = vector::pop_back(&mut wallet);
+        join_vec(&mut coin_, wallet);
+        let balance_mut = coin::balance_mut(&mut coin_);
         // transfer market fee to beneficiary
         let market_fee = marketplace::calc_market_fee(market, listing.price);
         transfer(
@@ -267,6 +274,7 @@ module Souffl3::Market {
         let buyer = tx_context::sender(ctx);
         let transfer_cap = extract_transfer_cap_from_listing(listing);
         safe::transfer_generic_nft_to_recipient<T>(transfer_cap, seller, seller_safe);
+        transfer::transfer(coin_, buyer);
 
         event::emit(BuyEvent<FT> {
             seller,

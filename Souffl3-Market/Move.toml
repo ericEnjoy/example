@@ -6,5 +6,5 @@ version = "0.0.1"
 NftProtocol = {git = "git@github.com:Origin-Byte/nft-protocol.git", rev="main" }
 
 [addresses]
-Souffl3 =  "0x9928a8d3d9ada1e44d4c6ba193597928dc237ab6"
+Souffl3 =  "0xde1cc780dad75e5ec9832563bfe93c5d6359b12b"
 sui =  "0000000000000000000000000000000000000002"

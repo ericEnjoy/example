@@ -1,15 +1,5 @@
 from pysui.sui.sui_clients.sync_client import SuiClient
 from pysui.sui.sui_config import SuiConfig
-from pysui.sui.sui_txresults.complex_tx import (
-    SubscribedEvent,
-    SubscribedEventParms,
-    EventEnvelope,
-    SubscribedTransaction,
-)
-from pysui.sui.sui_builders.subscription_builders import (
-    SubscribeEvent,
-    SubscribeTransaction,
-)
 from pysui.sui.sui_types.scalars import SuiString, ObjectID, SuiInteger
 from pysui.sui.sui_types.collections import SuiArray
 
@@ -36,14 +26,16 @@ print(client.config.active_address)
 
 result = client.move_call_txn(
     signer=client.config.active_address,
-    package_object_id=SuiString("0xc3068e837c975ae949bffc00221c686785d09568"),
+    package_object_id=SuiString("0xde1cc780dad75e5ec9832563bfe93c5d6359b12b"),
     module=SuiString("marketplace"),
     function=SuiString("create_market"),
     type_arguments=SuiArray([]),
     arguments=[SuiString("0x8a19ca58c96d873a17cbb17a27b04d6c5d604eff"), SuiString("1000")],
-    gas=gases[0].identifier,
+    gas=gases[3].identifier,
     gas_budget=SuiInteger(10000),
 )
+
+print(result.result_data)
 
 # result = client.move_call_txn(
 #     signer=client.config.active_address,
