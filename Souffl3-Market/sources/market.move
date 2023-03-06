@@ -33,6 +33,7 @@ module Souffl3::Market {
 
     struct ListEvent<phantom FT> has copy, drop {
         seller: address,
+        listing_id: ID,
         nft_id: ID,
         safe_id: ID,
         price: u64,
@@ -95,6 +96,7 @@ module Souffl3::Market {
             transfer_cap: some_transfer_cap,
             is_generic: false
         };
+        let listing_id = *object::borrow_id(&listing);
         // share listing
         share_object(listing);
         share_object(safe_);
@@ -102,6 +104,7 @@ module Souffl3::Market {
 
         event::emit(ListEvent<FT> {
             seller,
+            listing_id,
             nft_id,
             safe_id,
             price,
@@ -139,6 +142,7 @@ module Souffl3::Market {
             transfer_cap: some_transfer_cap,
             is_generic: false
         };
+        let listing_id = *object::borrow_id(&listing);
         // share listing
         share_object(listing);
         share_object(safe_);
@@ -146,6 +150,7 @@ module Souffl3::Market {
 
         event::emit(ListEvent<FT> {
             seller,
+            listing_id,
             nft_id,
             safe_id,
             price,
