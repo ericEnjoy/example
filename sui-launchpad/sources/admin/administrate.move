@@ -34,7 +34,7 @@ module sui_launchpad::administrate {
         regulated_mint_cap: Option<RegulatedMintCap<C>>
     }
 
-    struct AdminCap<phantom C> has key {
+    struct AdminCap<phantom C> has key, store {
         id: UID
     }
 

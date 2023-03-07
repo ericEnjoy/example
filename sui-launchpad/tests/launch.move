@@ -1,5 +1,5 @@
 #[test_only]
-module sui_launchpad::launch {
+module sui_launchpad::test_launch {
 
     use std::string;
 
@@ -26,9 +26,9 @@ module sui_launchpad::launch {
     /// Can be used for authorization of other actions post-creation. It is
     /// vital that this struct is not freely given to any contract, because it
     /// serves as an auth token.
-    struct Witness has drop {}
+    struct Witness has drop, store {}
 
-    fun init(witness: Gekacha, ctx: &mut TxContext) {
+    public fun create(witness: Witness, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
         let collection_max = 1000u64;
         let collection_reserve = 100u64;
@@ -63,7 +63,7 @@ module sui_launchpad::launch {
             string::utf8(b"GKC"),
         );
 
-        supply_domain::regulate(&witness, &mut collection, collection_max, false);
+        supply_domain::regulate(&witness, &mut collection, collection_max, true);
 
         let royalty = royalty::from_address(sender, ctx);
         royalty::add_proportional_royalty(&mut royalty, 100);
@@ -110,5 +110,21 @@ module sui_launchpad::launch {
 
         royalty::collect_royalty(collection, b, royalty_owed);
         royalties::transfer_remaining_to_beneficiary(Witness {}, payment, ctx);
+    }
+
+    const OWNER: address = @0xA1C05;
+    const FAKE_OWNER: address = @0xA1C11;
+
+    use sui::test_scenario::{Self, ctx};
+
+    #[test]
+    fun test_create() {
+
+
+        let scenario = test_scenario::begin(OWNER);
+        let ctx = ctx(&mut scenario);
+        create(Witness{}, ctx);
+
+        test_scenario::end(scenario);
     }
 }
