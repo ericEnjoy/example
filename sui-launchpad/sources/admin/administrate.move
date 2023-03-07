@@ -1,6 +1,7 @@
 module sui_launchpad::administrate {
 
     use std::vector;
+    use std::option::{Self, Option};
     use std::string::String;
 
     use sui::object::{Self, UID};
@@ -13,7 +14,7 @@ module sui_launchpad::administrate {
     use sui_launchpad::warehouse::{Self, Warehouse, NFTContent};
     use sui_launchpad::permission::{Self, Permission};
     use sui_launchpad::workshop;
-    use nft_protocol::mint_cap::{MintCap};
+    use nft_protocol::mint_cap::{UnregulatedMintCap, RegulatedMintCap};
 
     friend sui_launchpad::port;
 
@@ -27,20 +28,31 @@ module sui_launchpad::administrate {
         warehouse: Warehouse<C>
     }
 
+    struct MintCap<phantom C> has store {
+        mint_type: u8,
+        unregulated_mint_cap: Option<UnregulatedMintCap<C>>,
+        regulated_mint_cap: Option<RegulatedMintCap<C>>
+    }
+
     struct AdminCap<phantom C> has key {
         id: UID
     }
 
-    public entry fun create_launchpad_with_mint_cap<C>(
-        mint_cap: MintCap<C>,
+    public entry fun create_launchpad_with_unregulated_cap<C>(
+        mint_cap: UnregulatedMintCap<C>,
         collection_max: u64,
         reserve: u64,
         ctx: &mut TxContext
     ) {
         let warehouse_ = warehouse::create_warehouse<C>(ctx);
+        let mint_cap_ = MintCap<C> {
+            mint_type: 2,
+            unregulated_mint_cap: option::some(mint_cap),
+            regulated_mint_cap: option::none<RegulatedMintCap<C>>()
+        };
         let launchpad = Launchpad<C> {
             id: object::new(ctx),
-            mint_cap,
+            mint_cap: mint_cap_,
             collection_max,
             reserve,
             reserve_index: 1u64,
@@ -48,9 +60,31 @@ module sui_launchpad::administrate {
             warehouse: warehouse_
         };
         share_object(launchpad);
-        transfer(AdminCap<C> {
-            id: object::new(ctx)
-        }, tx_context::sender(ctx));
+    }
+
+    public entry fun create_launchpad_with_regulated_cap<C>(
+        mint_cap: RegulatedMintCap<C>,
+        collection_max: u64,
+        reserve: u64,
+        ctx: &mut TxContext
+    ) {
+        //TODO: assert mint_cap is original from C
+        let warehouse_ = warehouse::create_warehouse<C>(ctx);
+        let mint_cap_ = MintCap<C> {
+            mint_type: 1,
+            unregulated_mint_cap: option::none<UnregulatedMintCap<C>>(),
+            regulated_mint_cap: option::some(mint_cap)
+        };
+        let launchpad = Launchpad<C> {
+            id: object::new(ctx),
+            mint_cap: mint_cap_,
+            collection_max,
+            reserve,
+            reserve_index: 1u64,
+            mint_index: reserve + 1,
+            warehouse: warehouse_
+        };
+        share_object(launchpad);
     }
 
     public fun filling_warehouse_by_creator<C>(
@@ -161,7 +195,15 @@ module sui_launchpad::administrate {
     }
 
     fun mint_token<C>(nft_content: &NFTContent, mint_cap: &mut MintCap<C>, ctx: &mut TxContext): Nft<C> {
-        workshop::mint_token(nft_content, mint_cap, ctx)
+        // TODO: error unify
+        assert!(mint_cap.mint_type < 3, 1);
+        if(mint_cap.mint_type == 1) {
+            let cap_ = option::borrow_mut(&mut mint_cap.regulated_mint_cap);
+            workshop::mint_token_with_regulated(nft_content, cap_, ctx)
+        } else {
+            let cap_ = option::borrow(&mint_cap.unregulated_mint_cap);
+            workshop::mint_token_with_unregulated(nft_content, cap_, ctx)
+        }
     }
 
     public entry fun post_sale_mint_by_creator<C>(

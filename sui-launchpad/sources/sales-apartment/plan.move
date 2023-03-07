@@ -13,12 +13,10 @@ module sui_launchpad::plan {
     use sui::tx_context;
     use sui_launchpad::financial::Beneficiary;
     use sui_launchpad::financial;
-    use sui_launchpad::utils;
     use sui_launchpad::whitelist::Whitelist;
     use sui_launchpad::whitelist;
     use sui_launchpad::administrate::{Launchpad, AdminCap};
     use sui_launchpad::permission::{Self, Permission};
-    use sui_launchpad::utils::assert_same_module_as_witness;
 
     struct SalePlan<phantom C, phantom T> has key, store {
         id: UID,
