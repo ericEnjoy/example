@@ -1,11 +1,15 @@
 /// Utility functions
 module sui_launchpad::utils {
+    use std::bcs;
+    use std::hash;
     use std::ascii;
-    use std::string::{Self, String, sub_string};
-    use std::type_name;
     use std::vector;
+    use std::type_name;
+    use std::bit_vector::{Self, BitVector};
+    use std::string::{Self, String, sub_string};
 
     use sui::vec_map::{Self, VecMap};
+    use sui::bcs::{new, peel_u64};
 
     use nft_protocol::err;
 
@@ -77,5 +81,46 @@ module sui_launchpad::utils {
         };
 
         map
+    }
+
+    public fun pseudo_random(add: address, remaining: u64): u64 {
+        // add some more disturbance here
+        let x = bcs::to_bytes<address>(&add);
+        let y = bcs::to_bytes<u64>(&remaining);
+        vector::append(&mut x,y);
+        let tmp = hash::sha2_256(x);
+
+        let data = vector<u8>[];
+        let i =24;
+        while (i < 32) {
+            let x =vector::borrow(&tmp,i);
+            vector::append(&mut data,vector<u8>[*x]);
+            i= i+1;
+        };
+        assert!(remaining > 0, 999);
+
+        let bcs_value = new(data);
+        let random = peel_u64(&mut bcs_value) % remaining + 1;
+        if (random == 0 ) {
+            random = 1;
+        };
+        random
+    }
+
+    public fun create_bit_mask(nfts: u64): vector<BitVector> {
+        let full_buckets = nfts / 1024;
+        let remaining = nfts - full_buckets * 1024;
+        if (nfts < 1024) {
+            full_buckets = 0;
+            remaining = nfts;
+        };
+        let v1 = vector::empty();
+        while (full_buckets > 0) {
+            let new = bit_vector::new(1023);
+            vector::push_back(&mut v1, new);
+            full_buckets=full_buckets-1;
+        };
+        vector::push_back(&mut v1,bit_vector::new(remaining));
+        v1
     }
 }

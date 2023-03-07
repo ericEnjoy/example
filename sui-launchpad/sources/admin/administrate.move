@@ -15,6 +15,7 @@ module sui_launchpad::administrate {
     use sui_launchpad::permission::{Self, Permission};
     use sui_launchpad::workshop;
     use nft_protocol::mint_cap::{UnregulatedMintCap, RegulatedMintCap};
+    use sui_launchpad::computing_room::{Self, Maze};
 
     friend sui_launchpad::port;
 
@@ -25,7 +26,8 @@ module sui_launchpad::administrate {
         reserve: u64,
         reserve_index: u64,
         mint_index: u64,
-        warehouse: Warehouse<C>
+        warehouse: Warehouse<C>,
+        paper: Maze
     }
 
     struct MintCap<phantom C> has store {
@@ -42,6 +44,7 @@ module sui_launchpad::administrate {
         mint_cap: UnregulatedMintCap<C>,
         collection_max: u64,
         reserve: u64,
+        does_sequential: bool,
         ctx: &mut TxContext
     ): AdminCap<C> {
         let warehouse_ = warehouse::create_warehouse<C>(ctx);
@@ -50,6 +53,7 @@ module sui_launchpad::administrate {
             unregulated_mint_cap: option::some(mint_cap),
             regulated_mint_cap: option::none<RegulatedMintCap<C>>()
         };
+        let paper = computing_room::create_maze(does_sequential, collection_max);
         let launchpad = Launchpad<C> {
             id: object::new(ctx),
             mint_cap: mint_cap_,
@@ -57,7 +61,8 @@ module sui_launchpad::administrate {
             reserve,
             reserve_index: 1u64,
             mint_index: reserve + 1,
-            warehouse: warehouse_
+            warehouse: warehouse_,
+            paper
         };
         share_object(launchpad);
         AdminCap<C> {
@@ -69,15 +74,16 @@ module sui_launchpad::administrate {
         mint_cap: RegulatedMintCap<C>,
         collection_max: u64,
         reserve: u64,
+        does_sequential: bool,
         ctx: &mut TxContext
     ): AdminCap<C> {
-        //TODO: assert mint_cap is original from C
         let warehouse_ = warehouse::create_warehouse<C>(ctx);
         let mint_cap_ = MintCap<C> {
             mint_type: 1,
             unregulated_mint_cap: option::none<UnregulatedMintCap<C>>(),
             regulated_mint_cap: option::some(mint_cap)
         };
+        let paper = computing_room::create_maze(does_sequential, collection_max);
         let launchpad = Launchpad<C> {
             id: object::new(ctx),
             mint_cap: mint_cap_,
@@ -85,7 +91,8 @@ module sui_launchpad::administrate {
             reserve,
             reserve_index: 1u64,
             mint_index: reserve + 1,
-            warehouse: warehouse_
+            warehouse: warehouse_,
+            paper
         };
         share_object(launchpad);
         AdminCap<C> {
@@ -141,18 +148,27 @@ module sui_launchpad::administrate {
         ctx: &mut TxContext
     ) {
         let reserve_index_cur = launchpad.reserve_index;
+        let sender = tx_context::sender(ctx);
         // TODO: error unify
         assert!((reserve_index_cur + mint_amount) <= launchpad.reserve, 1);
         let i = 0;
         while(i < mint_amount) {
+            let remaining = get_remaining(
+                launchpad.collection_max,
+                launchpad.reserve,
+                launchpad.reserve_index,
+                reserve_index_cur
+            );
+            let mint_index = computing_room::get_mint_index(&mut launchpad.paper, remaining, reserve_index_cur, sender);
             let nft_content = warehouse::borrow_nft_content_mut(
-                &mut launchpad.warehouse, reserve_index_cur);
+                &mut launchpad.warehouse, mint_index);
             let token = mint_token<C>(nft_content, &mut launchpad.mint_cap, ctx);
             transfer(token, tx_context::sender(ctx));
             warehouse::nft_mark_as_used(nft_content);
             reserve_index_cur = reserve_index_cur + 1;
             i = i + 1;
         };
+        launchpad.reserve_index = reserve_index_cur;
     }
 
     public entry fun mint_reserve_by_admin<C>(
@@ -162,19 +178,28 @@ module sui_launchpad::administrate {
         ctx: &mut TxContext
     ) {
         permission::check_permission(permission, tx_context::sender(ctx));
+        let sender = tx_context::sender(ctx);
         let reserve_index_cur = launchpad.reserve_index;
         // TODO: error unify
         assert!((reserve_index_cur + mint_amount) <= launchpad.reserve, 1);
         let i = 0;
         while(i < mint_amount) {
+            let remaining = get_remaining(
+                launchpad.collection_max,
+                launchpad.reserve,
+                launchpad.reserve_index,
+                reserve_index_cur
+            );
+            let mint_index = computing_room::get_mint_index(&mut launchpad.paper, remaining, reserve_index_cur, sender);
             let nft_content = warehouse::borrow_nft_content_mut(
-                &mut launchpad.warehouse, reserve_index_cur);
+                &mut launchpad.warehouse, mint_index);
             let token = mint_token<C>(nft_content, &mut launchpad.mint_cap, ctx);
             transfer(token, tx_context::sender(ctx));
             warehouse::nft_mark_as_used(nft_content);
             reserve_index_cur = reserve_index_cur + 1;
             i = i + 1;
         };
+        launchpad.reserve_index = reserve_index_cur;
     }
 
     public(friend) fun sale_mint<C>(
@@ -182,21 +207,29 @@ module sui_launchpad::administrate {
         mint_amount: u64,
         ctx: &mut TxContext
     ): vector<Nft<C>> {
-        // TODO: assert sender with permission
-        let reserve_index_cur = launchpad.reserve_index;
+        let sender = tx_context::sender(ctx);
+        let mint_index_cur = launchpad.mint_index;
         // TODO: error unify
-        assert!((reserve_index_cur + mint_amount) <= launchpad.reserve, 1);
+        assert!((mint_index_cur + mint_amount) <= (launchpad.collection_max - launchpad.reserve), 1);
         let i = 0;
         let nfts = vector::empty<Nft<C>>();
         while(i < mint_amount) {
+            let remaining = get_remaining(
+                launchpad.collection_max,
+                launchpad.reserve,
+                launchpad.reserve_index,
+                mint_index_cur
+            );
+            let mint_index = computing_room::get_mint_index(&mut launchpad.paper, remaining, mint_index_cur, sender);
             let nft_content = warehouse::borrow_nft_content_mut(
-                &mut launchpad.warehouse, reserve_index_cur);
+                &mut launchpad.warehouse, mint_index);
             let token = mint_token<C>(nft_content, &mut launchpad.mint_cap, ctx);
             vector::push_back(&mut nfts, token);
             warehouse::nft_mark_as_used(nft_content);
-            reserve_index_cur = reserve_index_cur + 1;
+            mint_index_cur = mint_index_cur + 1;
             i = i + 1;
         };
+        launchpad.mint_index = mint_index_cur;
         nfts
     }
 
@@ -224,5 +257,9 @@ module sui_launchpad::administrate {
     }
 
     public entry fun update_sale_plan_name<C, MintType>() {}
+
+    fun get_remaining(max: u64, reserve: u64, reserve_index: u64, mint_index: u64): u64 {
+        max - (reserve_index - 1) - (mint_index - reserve - 1)
+    }
 
 }
