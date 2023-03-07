@@ -3,8 +3,8 @@ name = "Souffl3-Market"
 version = "0.0.1"
 
 [dependencies]
-NftProtocol = {git = "git@github.com:Origin-Byte/nft-protocol.git", rev="main" }
+NftProtocol = {git = "https://github.com/ericEnjoy/nft-protocol.git", rev="main" }
 
 [addresses]
-Souffl3 =  "0xde1cc780dad75e5ec9832563bfe93c5d6359b12b"
+Souffl3 =  "0x5f1fceec62555a2caee9173902c38429ca45182b"
 sui =  "0000000000000000000000000000000000000002"

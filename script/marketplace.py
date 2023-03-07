@@ -26,12 +26,12 @@ print(client.config.active_address)
 
 result = client.move_call_txn(
     signer=client.config.active_address,
-    package_object_id=SuiString("0xde1cc780dad75e5ec9832563bfe93c5d6359b12b"),
+    package_object_id=SuiString("0x5f1fceec62555a2caee9173902c38429ca45182b"),
     module=SuiString("marketplace"),
     function=SuiString("create_market"),
     type_arguments=SuiArray([]),
     arguments=[SuiString("0x8a19ca58c96d873a17cbb17a27b04d6c5d604eff"), SuiString("1000")],
-    gas=gases[3].identifier,
+    gas=gases[0].identifier,
     gas_budget=SuiInteger(10000),
 )
 
