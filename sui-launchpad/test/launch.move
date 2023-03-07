@@ -1,7 +1,7 @@
 #[test_only]
 module sui_launchpad::launch {
 
-    use std::string::{Self, String};
+    use std::string;
 
     use sui::object;
     use sui::balance;
@@ -17,6 +17,7 @@ module sui_launchpad::launch {
     use nft_protocol::royalties::{Self, TradePayment};
     use nft_protocol::collection::{Self, Collection};
     use nft_protocol::transfer_allowlist_domain;
+    use nft_protocol::supply_domain;
 
     use sui_launchpad::administrate;
 
@@ -62,6 +63,8 @@ module sui_launchpad::launch {
             string::utf8(b"GKC"),
         );
 
+        supply_domain::regulate(&witness, &mut collection, collection_max, false);
+
         let royalty = royalty::from_address(sender, ctx);
         royalty::add_proportional_royalty(&mut royalty, 100);
         royalty::add_royalty_domain(&Witness {}, &mut collection, royalty);
@@ -83,8 +86,12 @@ module sui_launchpad::launch {
             transfer_allowlist_domain::from_id(object::id(&allowlist)),
         );
 
-        administrate::create_launchpad_with_mint_cap(mint_cap, collection_max, collection_reserve, ctx);
+        let regulated_mint_cap = supply_domain::delegate(&mint_cap, &mut collection, 0, ctx);
 
+        let launchpad_admin_cap = administrate::create_launchpad_with_regulated_cap(regulated_mint_cap, collection_max, collection_reserve, ctx);
+
+        transfer::transfer(mint_cap, tx_context::sender(ctx));
+        transfer::transfer(launchpad_admin_cap, tx_context::sender(ctx));
         transfer::share_object(allowlist);
         transfer::share_object(collection);
     }
@@ -93,7 +100,7 @@ module sui_launchpad::launch {
     public entry fun collect_royalty<FT>(
         payment: &mut TradePayment<Gekacha, FT>,
         collection: &mut Collection<Gekacha>,
-        ctx: &mut TxContext,
+        ctx: &mut TxContext
     ) {
         let b = royalties::balance_mut(Witness {}, payment);
 

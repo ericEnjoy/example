@@ -38,12 +38,12 @@ module sui_launchpad::administrate {
         id: UID
     }
 
-    public entry fun create_launchpad_with_unregulated_cap<C>(
+    public fun create_launchpad_with_unregulated_cap<C>(
         mint_cap: UnregulatedMintCap<C>,
         collection_max: u64,
         reserve: u64,
         ctx: &mut TxContext
-    ) {
+    ): AdminCap<C> {
         let warehouse_ = warehouse::create_warehouse<C>(ctx);
         let mint_cap_ = MintCap<C> {
             mint_type: 2,
@@ -60,14 +60,17 @@ module sui_launchpad::administrate {
             warehouse: warehouse_
         };
         share_object(launchpad);
+        AdminCap<C> {
+            id: object::new(ctx)
+        }
     }
 
-    public entry fun create_launchpad_with_regulated_cap<C>(
+    public fun create_launchpad_with_regulated_cap<C>(
         mint_cap: RegulatedMintCap<C>,
         collection_max: u64,
         reserve: u64,
         ctx: &mut TxContext
-    ) {
+    ): AdminCap<C> {
         //TODO: assert mint_cap is original from C
         let warehouse_ = warehouse::create_warehouse<C>(ctx);
         let mint_cap_ = MintCap<C> {
@@ -85,6 +88,9 @@ module sui_launchpad::administrate {
             warehouse: warehouse_
         };
         share_object(launchpad);
+        AdminCap<C> {
+            id: object::new(ctx)
+        }
     }
 
     public fun filling_warehouse_by_creator<C>(
