@@ -13,7 +13,7 @@ module sui_launchpad::port {
     use sui_launchpad::financial;
 
 
-    entry fun sale_mint<C, T>(
+    public entry fun sale_mint<C, T>(
         launchpad: &mut Launchpad<C>,
         sale_plan: &mut SalePlan<C, T>,
         plan_index: u64,

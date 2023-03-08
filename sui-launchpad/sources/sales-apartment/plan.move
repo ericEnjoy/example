@@ -157,7 +157,7 @@ module sui_launchpad::plan {
         let sender = tx_context::sender(ctx);
         let plan = vector::borrow(&sale_plan.plans, plan_index);
         // TODO: error unify
-        assert!(plan.already_mint_amount_this_plan >= (plan.max_amount_this_plan + mint_amount), 2);
+        assert!(plan.already_mint_amount_this_plan <= (plan.max_amount_this_plan + mint_amount), 2);
         record::check(&plan.record, mint_amount, plan.max_mint_amount_per_address, sender);
         let time_now_sec = timestamp_ms(clock) / 1000;
         // TODO: error unify
@@ -208,5 +208,20 @@ module sui_launchpad::plan {
         };
     }
 
-
+    #[test_only]
+    public fun test_create_sale_plan<C, T>(
+        _admin_cap: &AdminCap<C>,
+        account_type: u8,
+        beneficiaries: vector<address>,
+        share_nums: vector<u64>,
+        ctx: &mut TxContext
+    ): SalePlan<C, T>{
+        let beneficiary = financial::create_beneficiary_shared(account_type, beneficiaries, share_nums);
+        let sale_plan = SalePlan<C, T> {
+            id: object::new(ctx),
+            plans: vector::empty<Plan>(),
+            beneficiary
+        };
+        sale_plan
+    }
 }

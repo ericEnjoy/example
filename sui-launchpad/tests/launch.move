@@ -20,6 +20,7 @@ module sui_launchpad::test_launch {
     use nft_protocol::supply_domain;
 
     use sui_launchpad::administrate;
+    use sui_launchpad::port;
 
     struct Gekacha has drop {}
 
@@ -28,18 +29,19 @@ module sui_launchpad::test_launch {
     /// serves as an auth token.
     struct Witness has drop, store {}
 
-    public fun create(witness: Witness, ctx: &mut TxContext) {
+    #[test_only]
+    public fun create(witness: Witness, ctx: &mut TxContext): (AdminCap<Gekacha>, Launchpad<Gekacha>) {
         let sender = tx_context::sender(ctx);
         let collection_max = 1000u64;
-        let collection_reserve = 100u64;
+        let collection_reserve = 0u64;
 
-        let (mint_cap, collection) = collection::create(&witness, ctx);
+        let (mint_cap, collection) = collection::create(&Gekacha {}, ctx);
 
         collection::add_domain(
-        &Witness {},
-        &mut collection,
-        creators::from_address<Gekacha, Witness>(
-        &Witness {}, sender,
+            &Witness {},
+            &mut collection,
+            creators::from_address<Gekacha, Witness>(
+                &Witness {}, sender,
             ),
         );
 
@@ -86,14 +88,20 @@ module sui_launchpad::test_launch {
             transfer_allowlist_domain::from_id(object::id(&allowlist)),
         );
 
-        let regulated_mint_cap = supply_domain::delegate(&mint_cap, &mut collection, 0, ctx);
+        let regulated_mint_cap = supply_domain::delegate(&mint_cap, &mut collection, 1000, ctx);
 
-        let launchpad_admin_cap = administrate::create_launchpad_with_regulated_cap(regulated_mint_cap, collection_max, collection_reserve, ctx);
+        let (admin_cap, launchpad) = administrate::test_create_launchpad_with_regulated_cap(
+            regulated_mint_cap,
+            collection_max,
+            collection_reserve,
+            true,
+            ctx
+        );
 
         transfer::transfer(mint_cap, tx_context::sender(ctx));
-        transfer::transfer(launchpad_admin_cap, tx_context::sender(ctx));
         transfer::share_object(allowlist);
         transfer::share_object(collection);
+        (admin_cap, launchpad)
     }
 
     /// Calculates and transfers royalties to the `RoyaltyDomain`
@@ -106,25 +114,105 @@ module sui_launchpad::test_launch {
 
         let domain = royalty::royalty_domain(collection);
         let royalty_owed =
-        royalty::calculate_proportional_royalty(domain, balance::value(b));
+            royalty::calculate_proportional_royalty(domain, balance::value(b));
 
         royalty::collect_royalty(collection, b, royalty_owed);
         royalties::transfer_remaining_to_beneficiary(Witness {}, payment, ctx);
     }
 
-    const OWNER: address = @0xA1C05;
+    const OWNER: address = @0x2;
     const FAKE_OWNER: address = @0xA1C11;
 
     use sui::test_scenario::{Self, ctx};
+    use sui_launchpad::administrate::{filling_warehouse_by_creator, AdminCap, Launchpad};
+    use sui_launchpad::plan;
 
     #[test]
     fun test_create() {
-
-
         let scenario = test_scenario::begin(OWNER);
         let ctx = ctx(&mut scenario);
-        create(Witness{}, ctx);
+        let (admin_cap, launchpad) = create(Witness {}, ctx);
+        transfer::transfer(admin_cap, OWNER);
+        transfer::transfer(launchpad, OWNER);
 
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_filling_warehouse() {
+        let scenario = test_scenario::begin(OWNER);
+        let ctx = ctx(&mut scenario);
+        let (admin_cap, launchpad) = create(Witness {}, ctx);
+        filling_warehouse_by_creator(
+            &admin_cap,
+            &mut launchpad,
+            vector[string::utf8(b"GG #1"), string::utf8(b"GG #2")],
+            vector[string::utf8(b"https://1"), string::utf8(b"https://2")],
+            vector[string::utf8(b"G1"), string::utf8(b"G2")],
+            vector[],
+            vector[]
+        );
+        transfer::transfer(admin_cap, OWNER);
+        transfer::transfer(launchpad, OWNER);
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_create_sale_plan() {
+        use sui::sui::SUI;
+        use sui::clock::{Self};
+        use sui::coin::{Self};
+        let scenario = test_scenario::begin(OWNER);
+        let ctx_ = ctx(&mut scenario);
+        let (admin_cap, launchpad) = create(Witness {}, ctx_);
+        filling_warehouse_by_creator(
+            &admin_cap,
+            &mut launchpad,
+            vector[string::utf8(b"GG #1"), string::utf8(b"GG #2")],
+            vector[string::utf8(b"https://1"), string::utf8(b"https://2")],
+            vector[string::utf8(b"G1"), string::utf8(b"G2")],
+            vector[],
+            vector[]
+        );
+        let sale_plan = plan::test_create_sale_plan<Gekacha, SUI>(
+            &admin_cap,
+            1,
+            vector[OWNER, OWNER],
+            vector[10, 20],
+            ctx_
+        );
+        plan::add_plan<Gekacha, SUI>(
+            &admin_cap,
+            &mut sale_plan,
+            string::utf8(b"Pre Sale I"),
+            100,
+            0,
+            1000,
+            false,
+            0,
+            100,
+            2,
+            ctx_
+        );
+        let clock_ = clock::create_for_testing(10);
+        let wallet = coin::mint_for_testing<SUI>(1000, ctx_);
+        port::sale_mint(
+            &mut launchpad,
+            &mut sale_plan,
+            0,
+            1,
+            vector<u8>[],
+            vector[wallet],
+            &clock_,
+            ctx_
+        );
+
+        transfer::transfer(admin_cap, OWNER);
+        transfer::transfer(launchpad, OWNER);
+        transfer::transfer(sale_plan, OWNER);
+
+        clock::delete_for_testing(clock_);
         test_scenario::end(scenario);
     }
 }

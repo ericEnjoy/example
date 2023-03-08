@@ -42,8 +42,9 @@ module sui_launchpad::record {
         mint_amount: u64,
         addr: address
     ) {
-        // TODO: error unify
-        assert!(table::contains(&record.record, addr), 8);
+        if (!table::contains(&record.record, addr)) {
+            table::add(&mut record.record, addr, 0);
+        };
         let addr_count = table::borrow_mut(&mut record.record, addr);
         *addr_count = *addr_count + mint_amount;
     }

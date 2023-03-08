@@ -19,7 +19,7 @@ module sui_launchpad::administrate {
 
     friend sui_launchpad::port;
 
-    struct Launchpad<phantom C> has key {
+    struct Launchpad<phantom C> has key, store {
         id: UID,
         mint_cap: MintCap<C>,
         collection_max: u64,
@@ -262,4 +262,63 @@ module sui_launchpad::administrate {
         max - (reserve_index - 1) - (mint_index - reserve - 1)
     }
 
+    #[test_only]
+    public fun test_create_launchpad_with_unregulated_cap<C>(
+        mint_cap: UnregulatedMintCap<C>,
+        collection_max: u64,
+        reserve: u64,
+        does_sequential: bool,
+        ctx: &mut TxContext
+    ): (AdminCap<C>, Launchpad<C>) {
+        let warehouse_ = warehouse::create_warehouse<C>(ctx);
+        let mint_cap_ = MintCap<C> {
+            mint_type: 2,
+            unregulated_mint_cap: option::some(mint_cap),
+            regulated_mint_cap: option::none<RegulatedMintCap<C>>()
+        };
+        let paper = computing_room::create_maze(does_sequential, collection_max);
+        let launchpad = Launchpad<C> {
+            id: object::new(ctx),
+            mint_cap: mint_cap_,
+            collection_max,
+            reserve,
+            reserve_index: 1u64,
+            mint_index: reserve + 1,
+            warehouse: warehouse_,
+            paper
+        };
+        (AdminCap<C> {
+            id: object::new(ctx)
+        }, launchpad)
+    }
+
+    #[test_only]
+    public fun test_create_launchpad_with_regulated_cap<C>(
+        mint_cap: RegulatedMintCap<C>,
+        collection_max: u64,
+        reserve: u64,
+        does_sequential: bool,
+        ctx: &mut TxContext
+    ): (AdminCap<C>, Launchpad<C>) {
+        let warehouse_ = warehouse::create_warehouse<C>(ctx);
+        let mint_cap_ = MintCap<C> {
+            mint_type: 1,
+            unregulated_mint_cap: option::none<UnregulatedMintCap<C>>(),
+            regulated_mint_cap: option::some(mint_cap)
+        };
+        let paper = computing_room::create_maze(does_sequential, collection_max);
+        let launchpad = Launchpad<C> {
+            id: object::new(ctx),
+            mint_cap: mint_cap_,
+            collection_max,
+            reserve,
+            reserve_index: 1u64,
+            mint_index: reserve + 1,
+            warehouse: warehouse_,
+            paper
+        };
+        (AdminCap<C> {
+            id: object::new(ctx)
+        }, launchpad)
+    }
 }
