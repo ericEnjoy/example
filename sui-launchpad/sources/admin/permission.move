@@ -43,6 +43,4 @@ module sui_launchpad::permission {
         assert!(table::contains(&permission.address, addr), 10);
     }
 
-
-
 }

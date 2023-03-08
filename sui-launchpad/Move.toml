@@ -6,4 +6,4 @@ version = "0.0.1"
 NftProtocol = {git = "https://github.com/ericEnjoy/nft-protocol.git", rev = "main"}
 
 [addresses]
-sui_launchpad =  "0x0"
+sui_launchpad =  "0xfdfe8940223686b8967fdae16e6d824808bab85d"
